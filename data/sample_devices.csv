@@ -1,0 +1,6 @@
+device_id,device_type,serial_number,status,location
+DEV-001,Portable Oxygen Monitor,SN-OXY-2026-1001,READY_FOR_REISSUE,Highland Clinic A
+DEV-002,3-Channel Portable ECG Recorder,SN-ECG-2026-1002,QUARANTINED,River Valley Clinic B
+DEV-003,Rural Field CPAP Machine,SN-CPA-2026-1003,INSPECTION_REQUIRED,Mobile Unit 1
+DEV-004,Ambulatory Infusion Pump,SN-INF-2026-1004,ISSUED,Central Depot
+DEV-005,Portable Oxygen Monitor,SN-OXY-2026-1005,READY_FOR_REISSUE,District Hospital

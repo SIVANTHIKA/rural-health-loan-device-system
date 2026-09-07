@@ -1,0 +1,6 @@
+accessory_id,accessory_name,category,criticality
+ACC-001,Finger Pulse Oximeter Sensor,Sensor,CRITICAL
+ACC-002,AC Power Adapter & Charger Cable,Charger,CRITICAL
+ACC-003,Padded Protective Carrying Case,Case,STANDARD
+ACC-004,USB Data Sync Cable,Cable,STANDARD
+ACC-005,Patient Quick-Start User Manual,Documentation,STANDARD
