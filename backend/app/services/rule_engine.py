@@ -12,21 +12,48 @@ from app.services.audit_service import log_audit
 DEFAULT_RULES = [
     {
         "rule_id": "RULE-01",
-        "rule_name": "Accessory Reconciliation Rule",
-        "condition_expr": "returned_quantity < expected_quantity",
-        "recommendation": "Missing accessory detected. Quarantine accessory kit and issue replacement request.",
+        "rule_name": "Critical Accessory Reconciliation Rule",
+        "condition_expr": "returned_quantity < expected_quantity and criticality == 'CRITICAL'",
+        "recommendation": "Missing critical accessory detected. Quarantine accessory kit and issue urgent replacement request.",
         "risk_level": "HIGH",
-        "required_human_action": "Authorised staff must verify missing items and assign replacement follow-up task.",
-        "evidence_description": "One or more expected accessories were not returned with the device."
+        "required_human_action": "Inventory Lead must initiate urgent 24h restock order. Device kit must remain quarantined.",
+        "evidence_description": "Critical diagnostic sensor probe, cable harness, or power charger missing or damaged."
+    },
+    {
+        "rule_id": "RULE-01B",
+        "rule_name": "Standard Accessory Restock Advisory",
+        "condition_expr": "returned_quantity < expected_quantity and criticality == 'STANDARD'",
+        "recommendation": "Standard non-critical accessory missing. Issue routine 72h restock advisory. No device quarantine required.",
+        "risk_level": "LOW",
+        "required_human_action": "Field staff or inventory clerk restock standard accessory item within 72 hours.",
+        "evidence_description": "Standard documentation, pouch, or non-diagnostic consumable accessory missing."
     },
     {
         "rule_id": "RULE-02",
-        "rule_name": "Major Damage Inspection Rule",
-        "condition_expr": "exterior == 'Major damage' or screen in ['Cracked', 'Not functioning'] or power == 'Does not power on' or sensors == 'Damaged'",
-        "recommendation": "Major hardware damage detected. Quarantine device and send to technical service.",
+        "rule_name": "Major Hardware Damage Escalation Rule",
+        "condition_expr": "exterior == 'Major damage' or screen in ['Cracked', 'Not functioning'] or power in ['Does not power on', 'Charging issue'] or sensors == 'Damaged' or ports == 'Damaged'",
+        "recommendation": "Major hardware damage detected. Quarantine device and dispatch technical service order.",
         "risk_level": "HIGH",
-        "required_human_action": "Authorised reviewer must confirm quarantine status and dispatch maintenance ticket.",
-        "evidence_description": "Condition assessment identified physical, screen, power, or sensor defect."
+        "required_human_action": "Authorised reviewer must confirm quarantine status and dispatch biomedical repair ticket.",
+        "evidence_description": "Condition assessment identified physical casing breach, display failure, power malfunction, or damaged sensors/ports."
+    },
+    {
+        "rule_id": "RULE-02B",
+        "rule_name": "Minor Cosmetic Wear Clearance Rule",
+        "condition_expr": "exterior == 'Minor cosmetic wear' and screen == 'Good' and power == 'Normal' and sensors == 'Functional'",
+        "recommendation": "Minor cosmetic wear (surface scuffs/scratches) recorded. Non-escalating routine observation. Device safe for clinical clearance.",
+        "risk_level": "LOW",
+        "required_human_action": "Log cosmetic condition observation in inventory records. Routine clinical release permitted.",
+        "evidence_description": "Superficial exterior scuffs or scratches with intact mechanical casing and operational sensors."
+    },
+    {
+        "rule_id": "RULE-02C",
+        "rule_name": "Minor Hardware Degradation Inspection Rule",
+        "condition_expr": "exterior == 'Minor damage' or buttons == 'Partially functional' or battery == 'Weak'",
+        "recommendation": "Minor hardware degradation detected. Routine biomedical inspection scheduled prior to re-issue.",
+        "risk_level": "MEDIUM",
+        "required_human_action": "Biomedical technician conduct routine inspection or battery replacement within 48h.",
+        "evidence_description": "Minor casing damage, partially responsive buttons, or degraded battery capacity."
     },
     {
         "rule_id": "RULE-03",
@@ -81,6 +108,13 @@ def seed_rules_if_empty(db: Session):
         if not existing:
             rule_obj = Rule(**r_data)
             db.add(rule_obj)
+        else:
+            existing.rule_name = r_data["rule_name"]
+            existing.condition_expr = r_data["condition_expr"]
+            existing.recommendation = r_data["recommendation"]
+            existing.risk_level = r_data["risk_level"]
+            existing.required_human_action = r_data["required_human_action"]
+            existing.evidence_description = r_data["evidence_description"]
     db.commit()
 
 def evaluate_device_return(db: Session, return_id: str) -> Dict:
@@ -114,9 +148,11 @@ def evaluate_device_return(db: Session, return_id: str) -> Dict:
     generated_recs = []
     created_tasks = []
 
-    # 1. Evaluate Accessory Reconciliation
-    missing_acc_names = []
-    has_critical_missing = False
+    # 1. Evaluate Accessory Reconciliation: Critical vs Standard
+    critical_missing_names = []
+    standard_missing_names = []
+    excess_acc_names = []
+
     for item in ret_accs:
         acc_catalog = db.query(AccessoryCatalog).filter(AccessoryCatalog.accessory_id == item.accessory_id).first()
         acc_name = acc_catalog.accessory_name if acc_catalog else item.accessory_id
@@ -124,20 +160,26 @@ def evaluate_device_return(db: Session, return_id: str) -> Dict:
 
         if item.returned_quantity < item.expected_quantity or item.condition == "MISSING":
             missing_count = item.expected_quantity - item.returned_quantity
-            missing_acc_names.append(f"{acc_name} (Missing {missing_count})")
+            item_desc = f"{acc_name} (Missing {missing_count})"
             if is_critical:
-                has_critical_missing = True
+                critical_missing_names.append(item_desc)
+            else:
+                standard_missing_names.append(item_desc)
         elif item.condition == "DAMAGED":
-            missing_acc_names.append(f"{acc_name} (Damaged)")
+            item_desc = f"{acc_name} (Damaged)"
+            if is_critical:
+                critical_missing_names.append(item_desc)
+            else:
+                standard_missing_names.append(item_desc)
         elif item.returned_quantity > item.expected_quantity:
-            missing_acc_names.append(f"{acc_name} (Excess quantity: {item.returned_quantity} vs expected {item.expected_quantity})")
+            excess_acc_names.append(f"{acc_name} (Excess: {item.returned_quantity} vs expected {item.expected_quantity})")
 
-    if missing_acc_names:
-        flagged_issues.append("Missing/Damaged Accessories")
-        rule_obj = db.query(Rule).filter(Rule.rule_id == "RULE-01").first()
-        risk = "HIGH" if has_critical_missing else "MEDIUM"
+    # Critical / High-Value Missing Accessory Escalation (RULE-01)
+    if critical_missing_names:
+        flagged_issues.append("Missing Critical/High-Value Accessories")
+        risk = "CRITICAL" if len(critical_missing_names) >= 2 else "HIGH"
         rec_id = f"REC-{uuid.uuid4().hex[:8].upper()}"
-        detail_msg = f"Missing accessories detected: {', '.join(missing_acc_names)}. Replacement required."
+        detail_msg = f"Missing critical accessories detected: {', '.join(critical_missing_names)}. Kit quarantined. Immediate replacement required."
         
         rec = Recommendation(
             recommendation_id=rec_id,
@@ -150,23 +192,70 @@ def evaluate_device_return(db: Session, return_id: str) -> Dict:
         db.add(rec)
         generated_recs.append(rec)
 
-        # Create Follow-up Task
         task_id = f"TSK-{uuid.uuid4().hex[:8].upper()}"
         task = FollowUpTask(
             task_id=task_id,
             return_id=return_id,
             device_id=device_return.device_id,
-            issue_type="Missing Accessory",
+            issue_type="Missing Critical Accessory",
             description=detail_msg,
-            priority=risk,
+            priority="HIGH",
             assigned_to="Inventory Lead",
-            due_date=datetime.datetime.utcnow() + datetime.timedelta(hours=24 if risk == "HIGH" else 48),
+            due_date=datetime.datetime.utcnow() + datetime.timedelta(hours=24),
             status="OPEN"
         )
         db.add(task)
         created_tasks.append(task)
 
-    # 2. Evaluate Condition Checklist
+    # Standard Accessory Restock Advisory (RULE-01B) - Non-escalating
+    if standard_missing_names:
+        rec_id = f"REC-{uuid.uuid4().hex[:8].upper()}"
+        detail_msg = f"Non-critical accessory missing/damaged: {', '.join(standard_missing_names)}. Routine 72h restock advisory."
+        
+        rec = Recommendation(
+            recommendation_id=rec_id,
+            return_id=return_id,
+            rule_id="RULE-01B",
+            recommendation=detail_msg,
+            risk_level="LOW",
+            status="PENDING"
+        )
+        db.add(rec)
+        generated_recs.append(rec)
+
+        task_id = f"TSK-{uuid.uuid4().hex[:8].upper()}"
+        task = FollowUpTask(
+            task_id=task_id,
+            return_id=return_id,
+            device_id=device_return.device_id,
+            issue_type="Routine Accessory Restock",
+            description=detail_msg,
+            priority="LOW",
+            assigned_to="Inventory Clerk",
+            due_date=datetime.datetime.utcnow() + datetime.timedelta(hours=72),
+            status="OPEN"
+        )
+        db.add(task)
+        created_tasks.append(task)
+
+    # Excess accessories audit note
+    if excess_acc_names:
+        task_id = f"TSK-{uuid.uuid4().hex[:8].upper()}"
+        task = FollowUpTask(
+            task_id=task_id,
+            return_id=return_id,
+            device_id=device_return.device_id,
+            issue_type="Excess Accessory Inventory Audit",
+            description=f"Returned excess items: {', '.join(excess_acc_names)}. Log and return to stock.",
+            priority="LOW",
+            assigned_to="Inventory Clerk",
+            due_date=datetime.datetime.utcnow() + datetime.timedelta(hours=72),
+            status="OPEN"
+        )
+        db.add(task)
+        created_tasks.append(task)
+
+    # 2. Evaluate Condition Checklist: Major Damage vs Minor Cosmetic Wear vs Minor Degradation
     if cond:
         is_major_damage = (
             cond.exterior == "Major damage" or
@@ -175,11 +264,21 @@ def evaluate_device_return(db: Session, return_id: str) -> Dict:
             cond.sensors in ["Damaged"] or
             cond.ports in ["Damaged"]
         )
+        is_minor_damage = (
+            cond.exterior == "Minor damage" or
+            cond.buttons in ["Partially functional", "Not functional"] or
+            cond.battery in ["Weak", "Unknown"]
+        )
+        is_minor_cosmetic = (
+            cond.exterior == "Minor cosmetic wear" and
+            not is_major_damage and
+            not is_minor_damage
+        )
+
         if is_major_damage:
             flagged_issues.append("Major Physical/Hardware Damage")
-            rule_obj = db.query(Rule).filter(Rule.rule_id == "RULE-02").first()
             rec_id = f"REC-{uuid.uuid4().hex[:8].upper()}"
-            damage_details = f"Device condition failure: Exterior ({cond.exterior}), Screen ({cond.screen}), Power ({cond.power}), Sensors ({cond.sensors}). Technical inspection required."
+            damage_details = f"Major hardware damage detected: Exterior ({cond.exterior}), Screen ({cond.screen}), Power ({cond.power}), Sensors ({cond.sensors}), Ports ({cond.ports}). Device quarantined."
             
             rec = Recommendation(
                 recommendation_id=rec_id,
@@ -207,13 +306,57 @@ def evaluate_device_return(db: Session, return_id: str) -> Dict:
             db.add(task)
             created_tasks.append(task)
 
+        elif is_minor_damage:
+            flagged_issues.append("Minor Hardware Degradation")
+            rec_id = f"REC-{uuid.uuid4().hex[:8].upper()}"
+            degradation_details = f"Minor hardware degradation: Exterior ({cond.exterior}), Buttons ({cond.buttons}), Battery ({cond.battery}). Routine maintenance required."
+            
+            rec = Recommendation(
+                recommendation_id=rec_id,
+                return_id=return_id,
+                rule_id="RULE-02C",
+                recommendation=degradation_details,
+                risk_level="MEDIUM",
+                status="PENDING"
+            )
+            db.add(rec)
+            generated_recs.append(rec)
+
+            task_id = f"TSK-{uuid.uuid4().hex[:8].upper()}"
+            task = FollowUpTask(
+                task_id=task_id,
+                return_id=return_id,
+                device_id=device_return.device_id,
+                issue_type="Minor Maintenance - Routine",
+                description=degradation_details,
+                priority="MEDIUM",
+                assigned_to="Biomedical Technician (Routine)",
+                due_date=datetime.datetime.utcnow() + datetime.timedelta(hours=48),
+                status="OPEN"
+            )
+            db.add(task)
+            created_tasks.append(task)
+
+        elif is_minor_cosmetic:
+            rec_id = f"REC-{uuid.uuid4().hex[:8].upper()}"
+            cosmetic_msg = "Minor cosmetic wear (surface scuffs/scratches) recorded on exterior casing. Non-escalating observation. Device safe for clinical clearance pending routine sanitisation."
+            rec = Recommendation(
+                recommendation_id=rec_id,
+                return_id=return_id,
+                rule_id="RULE-02B",
+                recommendation=cosmetic_msg,
+                risk_level="LOW",
+                status="PENDING"
+            )
+            db.add(rec)
+            generated_recs.append(rec)
+            # Minor cosmetic wear does NOT escalate risk, does NOT add to flagged_issues, and does NOT quarantine the device.
+
     # 3. Evaluate Cleaning Status
     if cleaning and cleaning.status != "COMPLETED":
         flagged_issues.append("Cleaning Incomplete")
-        rule_obj = db.query(Rule).filter(Rule.rule_id == "RULE-03").first()
-        rec_id = f"REC-{uuid.uuid4().hex[:8].upper()}"
         clean_msg = f"Cleaning status is '{cleaning.status}'. Decontamination protocol must be completed prior to reissue."
-        
+        rec_id = f"REC-{uuid.uuid4().hex[:8].upper()}"
         rec = Recommendation(
             recommendation_id=rec_id,
             return_id=return_id,
@@ -287,12 +430,12 @@ def evaluate_device_return(db: Session, return_id: str) -> Dict:
         db.add(rec)
         generated_recs.append(rec)
 
-    # 6 & 7. Safety Re-issue Blocker & HITL Review Requirement
+    # 6 & 7. Overall Risk & HITL Review Requirement
     overall_risk = "LOW"
     risk_levels = [r.risk_level for r in generated_recs]
     if "CRITICAL" in risk_levels or len(flagged_issues) >= 2:
         overall_risk = "CRITICAL"
-    elif "HIGH" in risk_levels or has_critical_missing:
+    elif "HIGH" in risk_levels or len(critical_missing_names) > 0:
         overall_risk = "HIGH"
     elif "MEDIUM" in risk_levels:
         overall_risk = "MEDIUM"
@@ -315,13 +458,16 @@ def evaluate_device_return(db: Session, return_id: str) -> Dict:
     device_return.overall_risk_level = overall_risk
     if overall_risk in ["HIGH", "CRITICAL"]:
         device_return.status = "QUARANTINED"
-        device.status = "QUARANTINED"
+        if device:
+            device.status = "QUARANTINED"
     elif overall_risk == "MEDIUM":
         device_return.status = "INSPECTION_REQUIRED"
-        device.status = "INSPECTION_REQUIRED"
+        if device:
+            device.status = "INSPECTION_REQUIRED"
     else:
         device_return.status = "IN_REVIEW"
-        device.status = "RETURNED"
+        if device:
+            device.status = "RETURNED"
 
     db.commit()
 

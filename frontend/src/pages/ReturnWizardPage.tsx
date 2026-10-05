@@ -371,6 +371,7 @@ export const ReturnWizardPage: React.FC<ReturnWizardPageProps> = ({ currentRole,
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
               >
                 <option value="Good">Good</option>
+                <option value="Minor cosmetic wear">Minor cosmetic wear (routine scuffs)</option>
                 <option value="Minor damage">Minor damage</option>
                 <option value="Major damage">Major damage</option>
               </select>

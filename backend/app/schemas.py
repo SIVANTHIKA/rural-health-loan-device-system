@@ -1,5 +1,5 @@
 import datetime
-from typing import Optional, List
+from typing import Optional, List, Literal
 from pydantic import BaseModel, Field, ConfigDict
 
 # User Schemas
@@ -78,33 +78,72 @@ class DeviceIssueRecordResponse(BaseModel):
 # Return Checklist Input Schemas
 class AccessoryReturnItemInput(BaseModel):
     accessory_id: str
-    expected_quantity: int
-    returned_quantity: int
-    condition: str = Field(description="PRESENT, MISSING, DAMAGED, UNKNOWN")
+    expected_quantity: int = Field(ge=0, description="Expected quantity (>= 0)")
+    returned_quantity: int = Field(ge=0, description="Returned quantity (>= 0)")
+    condition: Literal["PRESENT", "MISSING", "DAMAGED", "EXCESS", "UNKNOWN"] = Field(
+        default="PRESENT",
+        description="PRESENT, MISSING, DAMAGED, EXCESS, UNKNOWN"
+    )
 
 class ReturnedAccessoriesBatchInput(BaseModel):
     items: List[AccessoryReturnItemInput]
 
 class ConditionCheckInput(BaseModel):
-    exterior: str = Field(default="Good", description="Good, Minor damage, Major damage")
-    screen: str = Field(default="Good", description="Good, Cracked, Not functioning")
-    buttons: str = Field(default="Functional", description="Functional, Partially functional, Not functional")
-    power: str = Field(default="Normal", description="Normal, Charging issue, Does not power on")
-    battery: str = Field(default="Normal", description="Normal, Weak, Unknown")
-    ports: str = Field(default="Good", description="Good, Damaged, Unknown")
-    sensors: str = Field(default="Functional", description="Functional, Damaged, Unknown")
-    physical_cleanliness: str = Field(default="Clean", description="Clean, Needs cleaning, Contaminated/uncertain")
+    exterior: Literal["Good", "Minor cosmetic wear", "Minor damage", "Major damage"] = Field(
+        default="Good",
+        description="Good, Minor cosmetic wear, Minor damage, Major damage"
+    )
+    screen: Literal["Good", "Cracked", "Not functioning"] = Field(
+        default="Good",
+        description="Good, Cracked, Not functioning"
+    )
+    buttons: Literal["Functional", "Partially functional", "Not functional"] = Field(
+        default="Functional",
+        description="Functional, Partially functional, Not functional"
+    )
+    power: Literal["Normal", "Charging issue", "Does not power on"] = Field(
+        default="Normal",
+        description="Normal, Charging issue, Does not power on"
+    )
+    battery: Literal["Normal", "Weak", "Unknown"] = Field(
+        default="Normal",
+        description="Normal, Weak, Unknown"
+    )
+    ports: Literal["Good", "Damaged", "Unknown"] = Field(
+        default="Good",
+        description="Good, Damaged, Unknown"
+    )
+    sensors: Literal["Functional", "Damaged", "Unknown"] = Field(
+        default="Functional",
+        description="Functional, Damaged, Unknown"
+    )
+    physical_cleanliness: Literal["Clean", "Needs cleaning", "Contaminated/uncertain"] = Field(
+        default="Clean",
+        description="Clean, Needs cleaning, Contaminated/uncertain"
+    )
     notes: Optional[str] = None
     photo_url: Optional[str] = None
 
 class PatientAckInput(BaseModel):
-    status: str = Field(description="RECEIVED, MISSING")
+    status: Literal["RECEIVED", "MISSING"] = Field(
+        default="RECEIVED",
+        description="RECEIVED, MISSING"
+    )
     method: str = Field(default="Signed Paper Form")
     notes: Optional[str] = None
 
 class CleaningInput(BaseModel):
-    status: str = Field(description="COMPLETED, PENDING, FAILED_UNCERTAIN, NOT_APPLICABLE")
+    status: Literal["COMPLETED", "PENDING", "FAILED_UNCERTAIN", "NOT_APPLICABLE"] = Field(
+        default="COMPLETED",
+        description="COMPLETED, PENDING, FAILED_UNCERTAIN, NOT_APPLICABLE"
+    )
     notes: Optional[str] = None
+
+class MultiStepReturnCheckoutRequest(BaseModel):
+    accessories: List[AccessoryReturnItemInput]
+    condition: ConditionCheckInput
+    patient_ack: PatientAckInput
+    cleaning: CleaningInput
 
 class CreateReturnRequest(BaseModel):
     device_id: str

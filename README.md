@@ -114,20 +114,24 @@ Frontend application opens at: `http://localhost:3000`
 ### 3. Running Automated Pytest Suite
 
 ```bash
-# Run backend tests
-python -m pytest backend/tests/
+# Run full test suite (rules, edge cases, e2e integration)
+cd backend
+python -m pytest tests/ -v
 ```
 
 ---
 
 ## Verified Edge Cases Handled
 
-1. **Edge Case 1: Missing Critical Accessory** ➔ Flags `HIGH` risk, blocks auto-release, creates inventory replacement task.
-2. **Edge Case 2: Major Physical Damage** ➔ Flags `HIGH`/`CRITICAL` risk, recommends quarantine, generates biomedical technician task.
+1. **Edge Case 1: Missing Critical Accessory** ➔ Flags `HIGH` risk, blocks auto-release, creates 24h SLA inventory replacement task with auto-escalation trigger.
+2. **Edge Case 2: Major Physical Damage** ➔ Flags `HIGH`/`CRITICAL` risk, enforces device quarantine, generates 24h biomedical technician task.
 3. **Edge Case 3: Cleaning Status Unknown/Pending** ➔ Flags `MEDIUM` risk, blocks re-issue until sanitisation protocol completed.
-4. **Edge Case 4: Duplicate Device Return** ➔ Server validation catches active return in progress and rejects duplicate.
-5. **Edge Case 5: Unknown Device ID** ➔ Rejects unregistered device barcodes with clear validation error.
+4. **Edge Case 4: Duplicate Device Return** ➔ Server validation catches active return in progress and rejects duplicate (HTTP 400).
+5. **Edge Case 5: Unknown Device ID** ➔ Rejects unregistered device barcodes with clear 404 validation error.
 6. **Edge Case 6: Returned Accessory Quantity Greater Than Expected** ➔ Flags excess accessory anomaly for inventory audit.
 7. **Edge Case 7: Patient Acknowledgement Missing** ➔ Creates field officer follow-up task to verify verbal/written receipt.
-8. **Edge Case 8: Overdue High-Priority Follow-Up** ➔ Auto-escalates overdue task to Operations Manager with alert badge.
+8. **Edge Case 8: Overdue High-Priority Follow-Up** ➔ Auto-escalates overdue task (>24h SLA) to Operations Manager with alert badge and audit trail.
 9. **Edge Case 9: Staff Overrides Recommendation Without Reason** ➔ Server rejects override attempts with empty/whitespace reason string (HTTP 422).
+10. **Edge Case 10: Missing Standard/Consumable Accessory Only** ➔ Rule `RULE-01B` logs `LOW` risk advisory and 72h restock task without forcing device quarantine.
+11. **Edge Case 11: Minor Cosmetic Wear** ➔ Rule `RULE-02B` classifies superficial scuffs/scratches as `LOW` risk routine observation, permitting clinical clearance without emergency quarantine.
+12. **Edge Case 12: Inconsistent Multi-Step State Prevention** ➔ Server-side completeness gate (HTTP 422) prevents evaluation of partial submissions, and atomic checkout (`POST /api/returns/{return_id}/checkout`) ensures all-or-nothing transactional integrity.
