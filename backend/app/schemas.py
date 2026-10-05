@@ -1,3 +1,26 @@
+"""
+Data Validation Schemas & Data Transfer Objects (DTOs)
+======================================================
+This module establishes strict Pydantic v2 data validation schemas across all
+RESTful API boundaries.
+
+Validation & Security Rationale:
+--------------------------------
+1. Boundary Invariant Enforcement: Field inputs from untrusted clients or remote
+   field devices are validated prior to execution or database persistence.
+2. Value Bounds & Literal Enums:
+   - Accessory return quantities strictly enforce non-negative integers (`ge=0`).
+   - Condition states are constrained to clinical enums ('Good', 'Minor cosmetic wear',
+     'Minor damage', 'Major damage') to prevent unpredictable rule evaluations.
+   - Decontamination and acknowledgement states require explicit standardized values.
+3. Decision Governance Integrity:
+   - Override requests enforce a minimum 3-character clinical explanation rationale
+     to ensure healthcare accountability.
+4. Serialisation Safety:
+   - `model_config = ConfigDict(from_attributes=True)` enables direct ORM entity
+     transformation while stripping internal sensitive attributes (e.g., passwords).
+"""
+
 import datetime
 from typing import Optional, List, Literal
 from pydantic import BaseModel, Field, ConfigDict

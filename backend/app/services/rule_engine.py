@@ -1,3 +1,33 @@
+"""
+Rule Engine & Clinical Decision Support Service
+===============================================
+This module implements the core deterministic clinical safety rule engine for
+evaluating returned portable medical loan devices in rural healthcare networks.
+
+Clinical Rationale & Regulatory Compliance:
+-------------------------------------------
+1. Patient Safety First: Medical devices (e.g. pulse oximeters, ECG monitors,
+   infusion pumps, nebulizers) operate under stringent safety standards. A missing
+   sensor probe, cracked casing, or incomplete decontamination directly jeopardizes
+   patient diagnostic accuracy and infection control.
+2. Differentiated Risk Thresholds:
+   - Critical Accessories (RULE-01): Diagnostic probes, patient leads, and power units
+     are mandatory for device function. Missing items immediately quarantine the kit.
+   - Standard Accessories (RULE-01B): Documentation, manuals, and carrying cases are
+     non-diagnostic. Flagging them as routine restock prevents unneeded device shortages.
+3. Mechanical vs Superficial Wear (RULE-02 vs RULE-02B):
+   - Superficial cosmetic scuffs occur routinely in rural field visits and do not
+     impair electrical isolation or sensor accuracy.
+   - Casing breaches, power failures, or sensor faults demand immediate quarantine.
+4. Infection Prevention & Decontamination (RULE-03):
+   - Devices returned from patient homes carry microbial cross-contamination risks.
+   - Unverified sanitisation blocks reissue until cleared by sanitisation staff.
+5. Human-in-the-Loop (HITL) Governance (RULE-07):
+   - Algorithms never autonomously clear high-risk medical devices for reissue.
+   - Clinicians or inventory leads retain ultimate decision authority with mandatory
+     override audit justification.
+"""
+
 import datetime
 import uuid
 from typing import List, Dict, Tuple

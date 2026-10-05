@@ -9,6 +9,7 @@ import { DeviceIssuesPage } from './pages/DeviceIssuesPage';
 import { DeviceInventoryPage } from './pages/DeviceInventoryPage';
 import { AuditLogPage } from './pages/AuditLogPage';
 import { ExperimentPage } from './pages/ExperimentPage';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 export function App() {
   const [currentRole, setCurrentRole] = useState<UserRole>('field_staff');
@@ -24,19 +25,21 @@ export function App() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-        {activeTab === 'dashboard' && <DashboardPage onNavigate={(tab) => setActiveTab(tab)} />}
-        {activeTab === 'return-wizard' && (
-          <ReturnWizardPage
-            currentRole={currentRole}
-            onReturnCompleted={() => setActiveTab('dashboard')}
-          />
-        )}
-        {activeTab === 'review-queue' && <HumanReviewQueuePage currentRole={currentRole} />}
-        {activeTab === 'tasks-escalation' && <TasksEscalationPage currentRole={currentRole} />}
-        {activeTab === 'device-issues' && <DeviceIssuesPage />}
-        {activeTab === 'inventory' && <DeviceInventoryPage />}
-        {activeTab === 'experiment' && <ExperimentPage />}
-        {activeTab === 'audit-logs' && <AuditLogPage />}
+        <ErrorBoundary fallbackTitle="Field Operations Display Notice" onReset={() => setActiveTab('dashboard')}>
+          {activeTab === 'dashboard' && <DashboardPage onNavigate={(tab) => setActiveTab(tab)} />}
+          {activeTab === 'return-wizard' && (
+            <ReturnWizardPage
+              currentRole={currentRole}
+              onReturnCompleted={() => setActiveTab('dashboard')}
+            />
+          )}
+          {activeTab === 'review-queue' && <HumanReviewQueuePage currentRole={currentRole} />}
+          {activeTab === 'tasks-escalation' && <TasksEscalationPage currentRole={currentRole} />}
+          {activeTab === 'device-issues' && <DeviceIssuesPage />}
+          {activeTab === 'inventory' && <DeviceInventoryPage />}
+          {activeTab === 'experiment' && <ExperimentPage />}
+          {activeTab === 'audit-logs' && <AuditLogPage />}
+        </ErrorBoundary>
       </main>
 
       <footer className="border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-500">

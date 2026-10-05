@@ -1,3 +1,35 @@
+"""
+Relational Database Models & Domain Entities
+============================================
+This module defines the complete SQLAlchemy ORM relational schema for the
+Rural Health Loan-Device Return Checklist & Accessory Reconciliation System.
+
+Architecture & Domain Groupings:
+--------------------------------
+1. Identity & Governance Domain:
+   - User: System actors with role-based access control (field_staff, clinician, ops_manager, admin).
+   - AuditLog: Immutable, append-only ledger tracking all clinical checkout and review actions.
+
+2. Inventory & Equipment Catalog Domain:
+   - Device: Medical hardware items tracked by unique serial numbers and clinical readiness status.
+   - AccessoryCatalog: Master catalog defining accessory items and clinical criticality (CRITICAL vs STANDARD).
+   - DeviceAccessory: Bill-of-materials mapping expected accessory items and quantities per device.
+   - DeviceIssueRecord: Lending records linking devices to patient references and loan periods.
+
+3. Return Checklist & Clinical Intake Domain:
+   - DeviceReturn: Core return transaction header tracking return lifecycle, risk level, and custody.
+   - ReturnedAccessory: Reconciled count and physical state of returned accessories versus expected.
+   - ConditionCheck: Granular multi-point hardware inspection checklist (exterior, screen, power, etc.).
+   - PatientAcknowledgement: Documented confirmation of device return by the patient or caregiver.
+   - CleaningRecord: Infection control decontamination audit record.
+
+4. Decision Support & Human-in-the-Loop Governance Domain:
+   - Rule: Configurable clinical safety rules and evidence descriptions.
+   - Recommendation: Deterministic decision-support advisories produced by the Rule Engine.
+   - ReviewDecision: Human-in-the-Loop confirmations or overrides with mandatory clinical rationale.
+   - FollowUpTask: Actionable maintenance, restock, or investigation tickets with automated SLA tracking.
+"""
+
 import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Float
 from sqlalchemy.orm import relationship

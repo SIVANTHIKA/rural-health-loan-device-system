@@ -1,3 +1,24 @@
+"""
+Device Return Intake & Checklist Router
+=======================================
+This router coordinates the clinical workflow for intake, hardware evaluation,
+accessory reconciliation, patient acknowledgement, and decontamination for loanable
+medical devices returning from patient residences to rural healthcare facilities.
+
+Operational Rationale:
+----------------------
+1. Strict Identity Validation: Devices must exist in the central asset catalog to prevent
+   untracked gray-market or decommissioned hardware from entering clinical circulation.
+2. Duplicate Return Protection: Prevents concurrent race conditions or accidental double
+   intakes of the same device by multiple field nurses.
+3. Atomic Multi-Step Checkout: Rural field clinics frequently experience intermittent cellular
+   and satellite internet. The atomic checkout endpoint (/checkout) ensures that all four
+   essential verification facets (accessories, condition, patient signoff, sanitisation) are
+   persisted within a single ACID transaction, preventing orphaned or half-completed records.
+4. State Machine Immutability: Once a return is marked COMPLETED or READY_FOR_REISSUE, its
+   historical assessment is sealed to preserve medico-legal chain of custody.
+"""
+
 import datetime
 import uuid
 from typing import List, Optional
